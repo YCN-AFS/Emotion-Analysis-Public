@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "title": "g debated",
+    "created_at": "2025-03-10T04:05:51.685Z",
+    "decision": "Nothing is being debated here."
+  },
+  "transcript_analysis": {
+    "dominant_emotions": [
+      [
+        "Tiredness",
+        5.269741146617595
+      ]
+    ],
+    "emotion_trends": {
+      "Tiredness": [
+        [
+          67.08,
+          5.269741146617595
+        ]
+      ]
+    },
+    "average_scores": {
+      "Tiredness": 5.269741146617595
+    }
+  },
+  "topic_analysis": {
+    "topics": {
+      "Friday departure": {
+        "Tiredness": 5.269741146617595
+      }
+    },
+    "top_emotional_topics": [
+      [
+        "Friday departure",
+        5.269741146617595
+      ]
+    ]
+  },
+  "overall_summary": "In g debated, the primary emotion detected was Tiredness (5.27) and in the context of Friday departure.",
+  "key_insight": "High levels of fatigue detected in the voice (intensity: 5.27)",
+  "emotional_context": "Fatigue can impact decision-making and communication clarity",
+  "suggested_action": "Consider scheduling important discussions during higher energy periods"
+}

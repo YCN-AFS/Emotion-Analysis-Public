@@ -1,0 +1,22 @@
+<<<<<<< HEAD
+=======
+# Environment variables
+>>>>>>> 3e10a01 (update)
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+dist/
+build/
+.vscode/
+.idea/
+*.swp
+*.swo
+.ipynb_checkpoints
+*.log
+.streamlit/
+Costella Hackathon March2025.xlsx
+hume-interviews.rar
+debug_json.json
+off.py
