@@ -769,6 +769,23 @@ def main():
                                     st.markdown(f"- _{sentence}_")
                             else:
                                 st.info("No significant emotional changes detected between topics.")
+
+                        # Add JSON data section
+                        st.subheader("📋 JSON Data")
+                        highlights_json = json.dumps({
+                            'emotional_timeline': timeline_data,
+                            'highest_emotional_point': {
+                                'topic': highlights['highest_point']['topic'],
+                                'total_score': highlights['highest_point']['total_score'],
+                                'sentences': highlights['highest_point']['sentences'],
+                                'emotions': highlights['highest_point']['emotions']
+                            },
+                            'largest_emotional_change': highlights['largest_change'],
+                            'top_emotions': highlights['top_emotions']
+                        }, indent=2, ensure_ascii=False)
+
+                        st.code(highlights_json, language='json')
+                        st.caption("👆 Click the code block above and press Ctrl+C (Windows) or Cmd+C (Mac) to copy")
                 else:
                     st.error("Analysis failed. Please try again.")
         else:
