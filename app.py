@@ -376,6 +376,159 @@ def analyze_emotions_from_transcript(transcript):
 
     return results
 
+def analyze_emotional_highlights(analysis_results):
+    """
+    Analyzes emotional highlights from the analysis results.
+    Returns information about highest emotional points and largest emotional changes.
+    """
+    emotional_data = []
+    total_emotions = {}
+    
+    # Process each topic and its sentences
+    for result in analysis_results:
+        topic = result['topic']
+        sentences = result['sentences']
+        emotions = result['emotions']
+        
+        # Calculate average emotion score for this topic
+        if emotions:
+            # Take top 5 strongest emotions for the topic
+            top_emotions = sorted(emotions, key=lambda x: x['score'], reverse=True)[:5]
+            total_score = sum(emotion['score'] for emotion in top_emotions)
+        else:
+            total_score = 0
+        
+        # Add to emotional_data for tracking changes
+        emotional_data.append({
+            'topic': topic,
+            'sentences': sentences,
+            'total_score': total_score,
+            'emotions': emotions
+        })
+        
+        # Accumulate emotions for total calculation
+        for emotion in emotions:
+            name = emotion['name']
+            score = emotion['score']
+            if name in total_emotions:
+                total_emotions[name] = max(total_emotions[name], score)  # Take max score for each emotion
+            else:
+                total_emotions[name] = score
+    
+    # Find highest emotional point
+    highest_emotional_point = max(emotional_data, key=lambda x: x['total_score'])
+    
+    # Find largest emotional change
+    largest_change = {
+        'change': 0,
+        'from_topic': None,
+        'to_topic': None,
+        'direction': None
+    }
+    
+    for i in range(len(emotional_data) - 1):
+        current_score = emotional_data[i]['total_score']
+        next_score = emotional_data[i + 1]['total_score']
+        change = abs(next_score - current_score)
+        
+        if change > largest_change['change']:
+            largest_change = {
+                'change': change,
+                'from_topic': emotional_data[i]['topic'],
+                'to_topic': emotional_data[i + 1]['topic'],
+                'direction': 'up' if next_score > current_score else 'down',
+                'from_sentences': emotional_data[i]['sentences'],
+                'to_sentences': emotional_data[i + 1]['sentences']
+            }
+    
+    # Get top 5 total emotions
+    sorted_total_emotions = sorted(total_emotions.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    return {
+        'highest_point': {
+            'topic': highest_emotional_point['topic'],
+            'sentences': highest_emotional_point['sentences'],
+            'total_score': highest_emotional_point['total_score'],
+            'emotions': highest_emotional_point['emotions']
+        },
+        'largest_change': largest_change,
+        'top_emotions': sorted_total_emotions
+    }
+
+def create_emotion_timeline(emotional_data):
+    """Creates a line chart showing emotional intensity over time."""
+    topics = [data['topic'] for data in emotional_data]
+    scores = [data['total_score'] for data in emotional_data]
+    
+    fig = go.Figure()
+    
+    # Add line and markers
+    fig.add_trace(go.Scatter(
+        x=topics,
+        y=scores,
+        mode='lines+markers',
+        name='Emotional Intensity',
+        line=dict(width=3),
+        marker=dict(size=10)
+    ))
+    
+    fig.update_layout(
+        title="Emotional Intensity Timeline",
+        xaxis_title="Topics",
+        yaxis_title="Emotional Intensity",
+        showlegend=True
+    )
+    
+    return fig
+
+def create_emotion_change_chart(largest_change):
+    """Creates a visual representation of emotional change."""
+    if not largest_change['from_topic']:
+        return None
+        
+    fig = go.Figure()
+    
+    # Add bars for before and after
+    fig.add_trace(go.Bar(
+        x=['Before Change', 'After Change'],
+        y=[0, largest_change['change']] if largest_change['direction'] == 'up' else [largest_change['change'], 0],
+        marker_color=['#1f77b4', '#2ca02c'] if largest_change['direction'] == 'up' else ['#2ca02c', '#1f77b4']
+    ))
+    
+    fig.update_layout(
+        title="Largest Emotional Change",
+        yaxis_title="Emotional Intensity Change",
+        showlegend=False
+    )
+    
+    return fig
+
+def create_top_emotions_chart(top_emotions):
+    """Creates a horizontal bar chart for top emotions."""
+    emotions = [emotion for emotion, _ in top_emotions]
+    scores = [score for _, score in top_emotions]
+    
+    fig = go.Figure()
+    
+    # Add horizontal bars
+    fig.add_trace(go.Bar(
+        y=emotions,
+        x=scores,
+        orientation='h',
+        marker_color='#ff7f0e',
+        text=[f"{score:.2f}" for score in scores],
+        textposition='auto',
+    ))
+    
+    fig.update_layout(
+        title="Top 5 Overall Emotions",
+        xaxis_title="Score",
+        yaxis_title="Emotion",
+        showlegend=False
+    )
+    
+    return fig
+
 def main():
     # Initialize session state
     if 'original_text' not in st.session_state:
@@ -473,7 +626,7 @@ def main():
                 analysis_results = analyze_emotions_from_transcript(text_input)
                 
                 if analysis_results:
-                    tab1, tab2, tab3 = st.tabs(["Detailed Results", "Charts", "Summary"])
+                    tab1, tab2, tab3, tab4 = st.tabs(["Detailed Results", "Charts", "Summary", "Emotional Highlights"])
                     
                     with tab1:
                         st.header("Detailed Analysis Results")
@@ -529,6 +682,93 @@ def main():
                             st.markdown(summary)
                         else:
                             st.error("Could not generate summary.")
+                    
+                    with tab4:
+                        st.header("Emotional Highlights Analysis")
+                        
+                        highlights = analyze_emotional_highlights(analysis_results)
+                        
+                        # Create three columns for better layout
+                        col1, col2 = st.columns([3, 2])
+                        
+                        with col1:
+                            # Display emotional timeline
+                            timeline_data = []
+                            for result in analysis_results:
+                                # Lấy top 3 cảm xúc mạnh nhất của topic
+                                top_emotions = sorted(result['emotions'], key=lambda x: x['score'], reverse=True)[:3]
+                                # Tính điểm tổng = tổng điểm của top 3 cảm xúc
+                                total_score = sum(emotion['score'] for emotion in top_emotions)
+                                timeline_data.append({
+                                    'topic': result['topic'],
+                                    'total_score': total_score
+                                })
+                            
+                            st.plotly_chart(
+                                create_emotion_timeline(timeline_data),
+                                use_container_width=True
+                            )
+                        
+                        with col2:
+                            # Display top 5 emotions chart
+                            st.plotly_chart(
+                                create_top_emotions_chart(highlights['top_emotions']),
+                                use_container_width=True
+                            )
+                        
+                        # Display highest emotional point with color
+                        st.subheader("🔥 Highest Emotional Point")
+                        with st.container():
+                            st.markdown(
+                                f"""
+                                <div style='background-color: rgba(255, 127, 14, 0.1); padding: 20px; border-radius: 10px;'>
+                                    <h3 style='color: #ff7f0e;'>Topic: {highlights['highest_point']['topic']}</h3>
+                                    <p><strong>Total Emotional Intensity:</strong> {highlights['highest_point']['total_score']:.2f}</p>
+                                    <p><strong>Key Sentences:</strong></p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            for sentence in highlights['highest_point']['sentences']:
+                                st.markdown(f"- _{sentence}_")
+                        
+                        # Display largest emotional change with visual
+                        st.subheader("📊 Largest Emotional Change")
+                        col3, col4 = st.columns([2, 3])
+                        
+                        with col3:
+                            change_chart = create_emotion_change_chart(highlights['largest_change'])
+                            if change_chart:
+                                st.plotly_chart(change_chart, use_container_width=True)
+                        
+                        with col4:
+                            change = highlights['largest_change']
+                            direction_color = "#2ca02c" if change['direction'] == 'up' else "#1f77b4"
+                            direction_text = change['direction'].upper() if change['direction'] else "NO CHANGE"
+                            st.markdown(
+                                f"""
+                                <div style='background-color: rgba(44, 160, 44, 0.1); padding: 20px; border-radius: 10px;'>
+                                    <h4 style='color: {direction_color};'>Direction: {direction_text}</h4>
+                                    <p><strong>Change Magnitude:</strong> {change['change']:.2f}</p>
+                                    <p><strong>From Topic:</strong> {change['from_topic'] or 'N/A'}</p>
+                                    <p><strong>To Topic:</strong> {change['to_topic'] or 'N/A'}</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        
+                        # Display sentences for the change
+                        with st.expander("View Detailed Change Sentences"):
+                            change = highlights['largest_change']
+                            if change.get('from_sentences') and change.get('to_sentences'):
+                                st.markdown("**Before change:**")
+                                for sentence in change['from_sentences']:
+                                    st.markdown(f"- _{sentence}_")
+                                st.markdown("**After change:**")
+                                for sentence in change['to_sentences']:
+                                    st.markdown(f"- _{sentence}_")
+                            else:
+                                st.info("No significant emotional changes detected between topics.")
                 else:
                     st.error("Analysis failed. Please try again.")
         else:
