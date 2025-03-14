@@ -13,11 +13,11 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
 # Initialize OpenAI client
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+api_key = os.getenv('OPENAI_API_KEY')
+if not api_key:
+    raise ValueError("OpenAI API key not found. Please check your .env file.")
+openai_client = OpenAI(api_key=api_key)
 
 def transcribe_audio(audio_file, source_language="en"):
     """
