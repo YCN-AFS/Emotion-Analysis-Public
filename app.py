@@ -9,6 +9,85 @@ from openai import OpenAI
 import io
 import urllib.parse
 from dotenv import load_dotenv
+import requests
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
+import queue
+import pydub
+import wave
+import logging
+import threading
+from typing import List
+
+# Cấu hình logging
+logging.basicConfig(level=logging.INFO)
+
+# Khởi tạo queue để lưu audio frames
+audio_frames: queue.Queue = queue.Queue()
+audio_buffer: List[bytes] = []
+recording = False
+recorded_audio = None
+
+def save_audio_frames(frames: List[bytes], sample_rate: int = 16000) -> str:
+    """Lưu audio frames thành file WAV."""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
+            with wave.open(temp_file.name, 'wb') as wave_file:
+                wave_file.setnchannels(1)  # mono
+                wave_file.setsampwidth(2)  # 16-bit
+                wave_file.setframerate(sample_rate)
+                wave_file.writeframes(b''.join(frames))
+            return temp_file.name
+    except Exception as e:
+        logging.error(f"Error saving audio: {e}")
+        return None
+
+class AudioProcessor:
+    def __init__(self):
+        self.audio_buffer = []
+        self.recording = False
+
+    def process_audio(self, frame):
+        if self.recording:
+            self.audio_buffer.append(frame.to_ndarray().tobytes())
+        return frame
+
+    def start_recording(self):
+        self.recording = True
+        self.audio_buffer = []
+
+    def stop_recording(self):
+        self.recording = False
+        return self.audio_buffer
+
+def audio_recorder():
+    """Component để ghi âm từ microphone."""
+    audio_processor = AudioProcessor()
+    
+    webrtc_ctx = webrtc_streamer(
+        key="audio-recorder",
+        mode=WebRtcMode.SENDONLY,
+        audio_receiver_size=1024,
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        media_stream_constraints={"video": False, "audio": True},
+    )
+
+    if not webrtc_ctx.state.playing:
+        return None
+
+    status_indicator = st.empty()
+    
+    if st.button("Start Recording"):
+        status_indicator.info("🎙️ Recording...")
+        audio_processor.start_recording()
+
+    if st.button("Stop Recording"):
+        status_indicator.success("✅ Recording finished!")
+        audio_frames = audio_processor.stop_recording()
+        if audio_frames:
+            audio_file = save_audio_frames(audio_frames)
+            return audio_file
+        
+    return None
 
 # Load environment variables
 load_dotenv()
@@ -556,7 +635,7 @@ def main():
     # Input method selection
     input_method = st.radio(
         "Select input method:",
-        ["Text", "Voice"]
+        ["Text", "Voice Upload", "Microphone"]
     )
     
     text_input = None
@@ -572,7 +651,8 @@ def main():
         if text_input:
             st.code(text_input)
             st.caption("👆 Click the text block above and press Ctrl+C (Windows) or Cmd+C (Mac) to copy")
-    else:
+    
+    elif input_method == "Voice Upload":
         st.header("Upload Audio File")
         
         source_language = st.selectbox(
@@ -620,6 +700,57 @@ def main():
                     st.code(text_input)
                     st.caption("👆 Click the text block above and press Ctrl+C (Windows) or Cmd+C (Mac) to copy")
     
+    else:  # Microphone
+        st.header("Record from Microphone")
+        
+        source_language = st.selectbox(
+            "Speaking language:",
+            options=["en", "vi", "ja", "ko", "zh", "fr", "de", "es", "it", "ru", "th", "id"],
+            index=0,
+            format_func=lambda x: {
+                "en": "English",
+                "vi": "Vietnamese",
+                "ja": "Japanese",
+                "ko": "Korean",
+                "zh": "Chinese",
+                "fr": "French",
+                "de": "German",
+                "es": "Spanish",
+                "it": "Italian",
+                "ru": "Russian",
+                "th": "Thai",
+                "id": "Indonesian"
+            }.get(x, x)
+        )
+        
+        st.markdown("""
+        Instructions:
+        1. Click 'START' to initialize microphone
+        2. Click 'Start Recording' to begin recording
+        3. Click 'Stop Recording' when finished
+        4. Wait for transcription
+        """)
+        
+        recorded_file = audio_recorder()
+        
+        if recorded_file:
+            with st.spinner("Processing audio..."):
+                with open(recorded_file, 'rb') as audio:
+                    text_input = transcribe_audio(audio, source_language)
+                
+                if text_input:
+                    st.success("Conversion successful!")
+                    
+                    st.subheader("Transcribed Text:")
+                    st.code(text_input)
+                    st.caption("👆 Click the text block above and press Ctrl+C (Windows) or Cmd+C (Mac) to copy")
+                
+                # Cleanup temporary file
+                try:
+                    os.unlink(recorded_file)
+                except:
+                    pass
+
     if st.button("Analyze Emotions"):
         if text_input:
             with st.spinner("Analyzing... Please wait."):
