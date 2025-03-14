@@ -61,33 +61,53 @@ class AudioProcessor:
 
 def audio_recorder():
     """Component để ghi âm từ microphone."""
-    audio_processor = AudioProcessor()
-    
-    webrtc_ctx = webrtc_streamer(
-        key="audio-recorder",
-        mode=WebRtcMode.SENDONLY,
-        audio_receiver_size=1024,
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        media_stream_constraints={"video": False, "audio": True},
-    )
-
-    if not webrtc_ctx.state.playing:
-        return None
-
-    status_indicator = st.empty()
-    
-    if st.button("Start Recording"):
-        status_indicator.info("🎙️ Recording...")
-        audio_processor.start_recording()
-
-    if st.button("Stop Recording"):
-        status_indicator.success("✅ Recording finished!")
-        audio_frames = audio_processor.stop_recording()
-        if audio_frames:
-            audio_file = save_audio_frames(audio_frames)
-            return audio_file
+    try:
+        audio_processor = AudioProcessor()
         
-    return None
+        webrtc_ctx = webrtc_streamer(
+            key="audio-recorder",
+            mode=WebRtcMode.SENDONLY,
+            audio_receiver_size=1024,
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+            media_stream_constraints={"video": False, "audio": True},
+        )
+
+        if not webrtc_ctx.state.playing:
+            st.warning("""
+            ⚠️ Không thể truy cập microphone. Vui lòng:
+            1. Sử dụng Chrome hoặc Firefox
+            2. Cho phép truy cập microphone khi trình duyệt yêu cầu
+            3. Kiểm tra xem microphone có hoạt động không
+            4. Thử refresh trang
+            """)
+            return None
+
+        status_indicator = st.empty()
+        
+        if st.button("Start Recording"):
+            status_indicator.info("🎙️ Recording...")
+            audio_processor.start_recording()
+
+        if st.button("Stop Recording"):
+            status_indicator.success("✅ Recording finished!")
+            audio_frames = audio_processor.stop_recording()
+            if audio_frames:
+                audio_file = save_audio_frames(audio_frames)
+                return audio_file
+            
+        return None
+        
+    except Exception as e:
+        st.error(f"""
+        ❌ Lỗi khi khởi tạo microphone: {str(e)}
+        
+        Vui lòng thử:
+        1. Sử dụng Chrome hoặc Firefox
+        2. Cho phép truy cập microphone
+        3. Kiểm tra kết nối microphone
+        4. Refresh trang
+        """)
+        return None
 
 # Load environment variables
 load_dotenv()
